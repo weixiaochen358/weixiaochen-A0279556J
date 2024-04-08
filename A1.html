@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3.js Visualizations</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+        .bar {
+            fill: steelblue;
+        }
+
+        .bar:hover {
+            fill: orange;
+        }
+
+        .axis-label {
+            font-size: 14px;
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 6px;
+            font-size: 14px;
+            background: lightsteelblue;
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Age Distribution (Histogram)</h2>
+    <svg id="ageHistogram" width="600" height="400"></svg>
+
+    <h2>Claim Amount vs. Income （Scatter Plot）</h2>
+    <svg id="scatterPlot" width="600" height="400"></svg>
+
+    <h2>Occupation Distribution (Pie Chart)</h2>
+    <svg id="occupationPieChart" width="500" height="500"></svg>
+
+
+    <script>
+        // Define the dimensions for the visualization
+        const margin = { top: 20, right: 30, bottom: 40, left: 90 },
+            width = 600 - margin.left - margin.right,
+            height = 400 - margin.top - margin.bottom;
+
+        // Function to create a histogram
+        function createHistogram(svgId, data, valueAccessor) {
+            const svg = d3.select(svgId)
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Create the X-axis band scale
+            const x = d3.scaleLinear()
+                .domain([0, d3.max(data, valueAccessor)])
+                .range([0, width]);
+
+            // Draw the X-axis on the DOM
+            svg.append("g")
+                .attr("transform", `translate(0, ${height})`)
+                .call(d3.axisBottom(x));
+
+            // Create the Y-axis band scale
+            const histogram = d3.histogram()
+                .value(valueAccessor)
+                .domain(x.domain())
+                .thresholds(x.ticks(40));
+
+            const bins = histogram(data);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(bins, d => d.length)])
+                .range([height, 0]);
+
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+            // Create the bars for the histogram
+            svg.selectAll("rect")
+                .data(bins)
+                .enter()
+                .append("rect")
+                .attr("x", d => x(d.x0) + 1)
+                .attr("transform", d => `translate(0, ${y(d.length)})`)
+                .attr("width", d => x(d.x1) - x(d.x0) - 1)
+                .attr("height", d => height - y(d.length))
+                .attr("fill", "#6b6ecf");
+        }
+
+        // Load the CSV data and create the visualizations
+        d3.csv('insurance_dataset.csv').then(data => {
+            // Convert numerical values from strings to numbers
+            data.forEach(d => {
+                d.Age = +d.Age;
+                d.Claim_Amount = +d.Claim_Amount;
+            });
+
+            // Create a histogram of ages
+            createHistogram("#ageHistogram", data, d => d.Age);
+        });
+
+
+        // Function to create a scatter plot
+        function createScatterPlot(svgId, data) {
+            const svg = d3.select(svgId)
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Create the X-axis linear scale for the scatter plot
+            const xScatter = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.Income)])
+                .range([0, width]);
+
+            // Draw the X-axis on the DOM for the scatter plot
+            svg.append("g")
+                .attr("transform", `translate(0, ${height})`)
+                .call(d3.axisBottom(xScatter));
+
+            // Create the Y-axis linear scale for the scatter plot
+            const yScatter = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.Claim_Amount)])
+                .range([height, 0]);
+
+            // Draw the Y-axis on the DOM for the scatter plot
+            svg.append("g")
+                .call(d3.axisLeft(yScatter));
+
+            // Create the scatter plot points
+            svg.selectAll(".point")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("class", "point")
+                .attr("cx", d => xScatter(d.Income))
+                .attr("cy", d => yScatter(d.Claim_Amount))
+                .attr("r", 3.5)
+                .attr("fill", "#d95f02");
+        }
+
+        // 假设你的数据加载和转换方式与之前相同
+        d3.csv('insurance_dataset.csv').then(data => {
+            // Convert numerical values from strings to numbers
+            data.forEach(d => {
+                d.Income = +d.Income;
+                d.Claim_Amount = +d.Claim_Amount;
+            });
+
+            // 前面已有直方图的创建，这里添加散点图
+            createScatterPlot("#scatterPlot", data);
+        });
+
+        function createPieChart(svgId, data) {
+        const svg = d3.select(svgId)
+            .attr("width", 500)
+            .attr("height", 500),
+            radius = Math.min(500, 500) / 2,
+            g = svg.append("g").attr("transform", "translate(" + 250 + "," + 250 + ")");
+
+        // Generate the pie
+        const pie = d3.pie().value(function(d) { return d.value; });
+
+        // Map data to the value of occupations
+        const dataProcessed = Array.from(d3.group(data, d => d.Occupation), ([key, value]) => ({key, value: value.length}));
+
+        // Generate the arcs
+        const arc = d3.arc()
+            .innerRadius(0)
+            .outerRadius(radius);
+
+        // Generate the color scale
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+        // Generate the pie chart
+        const arcs = g.selectAll(".arc")
+            .data(pie(dataProcessed))
+            .enter().append("g")
+            .attr("class", "arc");
+
+        // Draw arc paths
+        arcs.append("path")
+            .attr("d", arc)
+            .attr("fill", function(d, i) { return color(i); });
+
+        // Labels
+        arcs.append("text")
+            .attr("transform", function(d) { return "translate(" + arc.centroid(d) + ")"; })
+            .attr("text-anchor", "middle")
+            .text(function(d) { return d.data.key; });
+    }
+
+    // 假设你的数据加载和转换方式与之前相同
+    d3.csv('insurance_dataset.csv').then(data => {
+        // 转换数字值
+        data.forEach(d => {
+            d.Income = +d.Income;
+            d.Claim_Amount = +d.Claim_Amount;
+        });
+
+        // 创建直方图和散点图
+        // createHistogram("#ageHistogram", data, d => d.Age);
+        // createScatterPlot("#scatterPlot", data);
+
+        // 创建职业分布的饼状图
+        createPieChart("#occupationPieChart", data);
+    });
+
+
+
+
+
+    </script>
+</body>
+
+</html>
